@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tailwindcss/postcss": "^4.2.0",
     "@types/recharts": "^1.8.29",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
