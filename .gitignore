@@ -1,0 +1,47 @@
+# Dependências
+node_modules/
+
+# Builds e artefatos gerados
+dist/
+build/
+out/
+.next/
+.nuxt/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Arquivos de ambiente locais (nunca devem ir pro GitHub por segurança)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Arquivos de Sistema Operacional
+.DS_Store
+Thumbs.db
+
+# Caches de ferramentas (TypeScript, ESLint, Vite, etc)
+*.tsbuildinfo
+.eslintcache
+.cache/
+.parcel-cache/
+.vite/
+
+# Arquivos de cobertura de testes
+coverage/
+.nyc_output/
+
+# Editor/IDE
+.vscode/ /* Cuidado: remova esta linha se quiser compartilhar configurações do VSCode, mas deixe para não vazar caminhos locais */
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

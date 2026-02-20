@@ -1,0 +1,8 @@
+{
+  "name": "my-infra-workspace",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ]
+}
