@@ -5,9 +5,9 @@ Este projeto é uma implementação acadêmica de uma solução de monitoramento
 O projeto provê uma biblioteca customizada de agenciamento (`@my-infra/agent`), um servidor em execução que precisa ser monitorado e um Dashboard em tempo real para observabilidade de recursos de hardware.
 
 
-![Dashboard](docs\imgs\dashboard.png)
+![Dashboard](https://github.com/JoaoIto/telemetry-monitoring/blob/main/docs/imgs/dashboard.png?raw=true)
+![JSON-Metrics](https://github.com/JoaoIto/telemetry-monitoring/blob/main/docs/imgs/json-metrics.png?raw=true)
 
-![Métricas JSON](docs\imgs\json-metrics.png)
 ---
 
 ## 📑 Sumário
