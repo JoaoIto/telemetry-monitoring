@@ -4,6 +4,10 @@ Este projeto é uma implementação acadêmica de uma solução de monitoramento
 
 O projeto provê uma biblioteca customizada de agenciamento (`@my-infra/agent`), um servidor em execução que precisa ser monitorado e um Dashboard em tempo real para observabilidade de recursos de hardware.
 
+
+![Dashboard](docs\imgs\dashboard.png)
+
+![Métricas JSON](docs\imgs\json-metrics.png)
 ---
 
 ## 📑 Sumário
