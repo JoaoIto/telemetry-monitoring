@@ -15,16 +15,19 @@ interface Metrics {
   diskUsedPercentage: number;
   diskTotalGb: number;
   timestamp: number;
+  protocol?: string;
 }
 
 function App() {
   const [data, setData] = useState<Metrics[]>([]);
   const [isError, setIsError] = useState(false);
+  const [useSnmp, setUseSnmp] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch('http://localhost:9090/metrics');
+        const endpoint = useSnmp ? '/metrics/snmp' : '/metrics';
+        const response = await fetch(`http://localhost:9090${endpoint}`);
         if (!response.ok) throw new Error('Network response was not ok');
         const json = await response.json();
 
@@ -66,10 +69,10 @@ function App() {
           <div className="flex items-center gap-4">
             {/* Status Indicator */}
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full font-semibold shadow-sm border ${isError
-                ? 'bg-rose-100 text-rose-800 border-rose-300'
-                : isAlert
-                  ? 'bg-red-700 text-white border-red-500 animate-pulse'
-                  : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+              ? 'bg-rose-100 text-rose-800 border-rose-300'
+              : isAlert
+                ? 'bg-red-700 text-white border-red-500 animate-pulse'
+                : 'bg-emerald-100 text-emerald-800 border-emerald-300'
               }`}>
               <div className={`w-3 h-3 rounded-full ${isError ? 'bg-rose-500' : isAlert ? 'bg-white' : 'bg-emerald-500'}`} />
               {isError ? 'Agente Desconectado' : 'Conexão Ativa'}
@@ -80,6 +83,16 @@ function App() {
                 ALERTA DE INCIDENTE: Carga de CPU em {Math.round(latest!.cpu)}%
               </div>
             )}
+
+            <button
+              onClick={() => { setUseSnmp(!useSnmp); setData([]); }}
+              className={`px-4 py-2 rounded-full font-bold shadow-md transition-colors ${useSnmp
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-slate-200 text-slate-800 hover:bg-slate-300 border border-slate-300'
+                }`}
+            >
+              {useSnmp ? '📡 Via Protocolo SNMP (UDP)' : '🌐 Via API HTTP Direta'}
+            </button>
           </div>
         </header>
 

@@ -8,6 +8,7 @@
         "dev": "tsc -w"
     },
     "dependencies": {
+        "net-snmp": "^3.26.1",
         "systeminformation": "^5.25.0"
     },
     "devDependencies": {
