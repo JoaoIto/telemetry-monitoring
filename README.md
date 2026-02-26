@@ -87,6 +87,9 @@ npm run dev -w dashboard
 
 Testes de laboratórios práticos requerem demonstrações reais. A interface do Dashboard React tem instruções internas baseadas na CPU lida: se a CPU ultrapassar a linha de fogo (>80%), painéis vermelhos serão projetados alertando incidentes de falha técnica em tempo real.
 
+![Stress-test](https://github.com/JoaoIto/telemetry-monitoring/blob/main/docs/imgs/stress-test.png?raw=true)
+
+
 Para causar um vazamento síncrono que bloqueia o Node e força 100% da CPU, abra um promt inédito e comande de diretório raiz:
 
 ```bash
