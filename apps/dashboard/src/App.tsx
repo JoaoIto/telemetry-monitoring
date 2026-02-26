@@ -102,10 +102,10 @@ function App() {
             </button>
 
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full font-semibold shadow-sm border ${isError
-                ? 'bg-rose-100 text-rose-800 border-rose-300'
-                : isAlert
-                  ? 'bg-red-700 text-white border-red-500 animate-pulse'
-                  : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+              ? 'bg-rose-100 text-rose-800 border-rose-300'
+              : isAlert
+                ? 'bg-red-700 text-white border-red-500 animate-pulse'
+                : 'bg-emerald-100 text-emerald-800 border-emerald-300'
               }`}>
               <div className={`w-3 h-3 rounded-full ${isError ? 'bg-rose-500' : isAlert ? 'bg-white' : 'bg-emerald-500'}`} />
               {isError ? 'Agentes Offline' : 'Telemetria Ativa'}
@@ -145,6 +145,10 @@ function App() {
           <div className={`lg:col-span-2 p-6 rounded-2xl shadow-xl transition-colors duration-500 ${isAlert ? 'bg-red-900/50 border border-red-700' : 'bg-white border border-slate-200'}`}>
             <h2 className="text-xl font-semibold mb-6 flex items-center justify-between">
               <span>Comparativo de Coleta: Carga de CPU</span>
+              <div className="flex gap-4">
+                <span className="text-2xl font-black text-sky-600" title="HTTP/REST" >{latestHttp ? Math.round(latestHttp.cpu) : 0}%</span>
+                <span className="text-2xl font-black text-violet-600" title="SNMP/UDP">{latestSnmp ? Math.round(latestSnmp.cpu) : 0}%</span>
+              </div>
             </h2>
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -191,27 +195,48 @@ function App() {
               </ResponsiveContainer>
             </div>
           </div>
+        </div>
 
-          {/* Coluna Direita: Cards de Status Físico e OS */}
-          <div className="space-y-6">
+        {/* Linha Inferior: Rede e Memória */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-            <div className={`p-6 rounded-2xl shadow-lg border ${isAlert ? 'bg-red-900/30 border-red-800' : 'bg-white border-slate-200'}`}>
-              <h3 className="text-sm font-semibold uppercase tracking-wider opacity-70 mb-4">Host OS (Apenas HTTP)</h3>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs opacity-60">Sistema</p>
-                  <p className="font-medium truncate">{latestHttp?.os || '---'}</p>
-                </div>
-                <div>
-                  <p className="text-xs opacity-60">Processador</p>
-                  <p className="font-medium text-sm">{latestHttp?.cpuName || '---'} ({latestHttp?.cpuCores || '-'} Cores)</p>
-                </div>
-                <div>
-                  <p className="text-xs opacity-60">Uptime da Máquina</p>
-                  <p className="font-medium">{latestHttp ? formatUptime(latestHttp.uptime) : '---'}</p>
-                </div>
+          <div className={`p-6 rounded-2xl shadow-lg border ${isAlert ? 'bg-red-900/50 border-red-700' : 'bg-white border-slate-200'}`}>
+            <h3 className="text-lg font-medium opacity-80 mb-4">Tráfego de Rede</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h4 className="text-xs uppercase font-bold text-sky-600 mb-2">🌐 HTTP</h4>
+                <p className="text-sm font-mono text-emerald-600">RX: {latestHttp ? (latestHttp.rxSec * 1024).toFixed(1) : '0.0'} KB/s</p>
+                <p className="text-sm font-mono text-indigo-600">TX: {latestHttp ? (latestHttp.txSec * 1024).toFixed(1) : '0.0'} KB/s</p>
+              </div>
+              <div className="border-l pl-4 border-slate-200">
+                <h4 className="text-xs uppercase font-bold text-violet-600 mb-2">📡 SNMP (UDP)</h4>
+                <p className="text-sm font-mono text-emerald-600">RX: {latestSnmp ? (latestSnmp.rxSec * 1024).toFixed(1) : '0.0'} KB/s</p>
+                <p className="text-sm font-mono text-indigo-600">TX: {latestSnmp ? (latestSnmp.txSec * 1024).toFixed(1) : '0.0'} KB/s</p>
               </div>
             </div>
+          </div>
+
+          <div className={`p-6 rounded-2xl shadow-lg border ${isAlert ? 'bg-red-900/50 border-red-700' : 'bg-white border-slate-200'}`}>
+            <h3 className="text-lg font-medium opacity-80 mb-4">Alocação de Memória RAM</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h4 className="text-xs uppercase font-bold text-sky-600 mb-2">🌐 Via HTTP API</h4>
+                <p className="text-xl font-bold font-mono">
+                  {latestHttp ? Math.round(latestHttp.memoryUsedMb) : 0} <span className="text-xs opacity-50">MB</span>
+                </p>
+              </div>
+              <div className="border-l pl-4 border-slate-200">
+                <h4 className="text-xs uppercase font-bold text-violet-600 mb-2">📡 Via Agente SNMP</h4>
+                <p className="text-xl font-bold font-mono text-violet-900">
+                  {latestSnmp ? Math.round(latestSnmp.memoryUsedMb) : 0} <span className="text-xs opacity-50">MB</span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+{/* Coluna Direita: Cards de Status Físico e OS */}
+          <div className="space-y-6">
 
             <div className={`p-6 rounded-2xl shadow-lg border ${isAlert ? 'bg-red-900/30 border-red-800' : 'bg-white border-slate-200'}`}>
               <h3 className="text-sm font-semibold uppercase tracking-wider opacity-70 mb-4">Disco Local (Comparativo)</h3>
@@ -241,48 +266,24 @@ function App() {
 
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Linha Inferior: Rede e Memória */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-          <div className={`p-6 rounded-2xl shadow-lg border ${isAlert ? 'bg-red-900/50 border-red-700' : 'bg-white border-slate-200'}`}>
-            <h3 className="text-lg font-medium opacity-80 mb-4">Tráfego de Rede</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <h4 className="text-xs uppercase font-bold text-sky-600 mb-2">🌐 HTTP</h4>
-                <p className="text-sm font-mono text-emerald-600">RX: {latestHttp ? latestHttp.rxSec.toFixed(1) : '0.0'} MB/s</p>
-                <p className="text-sm font-mono text-indigo-600">TX: {latestHttp ? latestHttp.txSec.toFixed(1) : '0.0'} MB/s</p>
-              </div>
-              <div className="border-l pl-4 border-slate-200">
-                <h4 className="text-xs uppercase font-bold text-violet-600 mb-2">📡 SNMP (UDP)</h4>
-                <p className="text-sm font-mono text-emerald-600">RX: {latestSnmp ? latestSnmp.rxSec.toFixed(1) : '0.0'} MB/s</p>
-                <p className="text-sm font-mono text-indigo-600">TX: {latestSnmp ? latestSnmp.txSec.toFixed(1) : '0.0'} MB/s</p>
+            <div className={`p-6 rounded-2xl shadow-lg border ${isAlert ? 'bg-red-900/30 border-red-800' : 'bg-white border-slate-200'}`}>
+              <h3 className="text-sm font-semibold uppercase tracking-wider opacity-70 mb-4">Host OS (Apenas HTTP)</h3>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs opacity-60">Sistema</p>
+                  <p className="font-medium truncate">{latestHttp?.os || '---'}</p>
+                </div>
+                <div>
+                  <p className="text-xs opacity-60">Processador</p>
+                  <p className="font-medium text-sm">{latestHttp?.cpuName || '---'} ({latestHttp?.cpuCores || '-'} Cores)</p>
+                </div>
+                <div>
+                  <p className="text-xs opacity-60">Uptime da Máquina</p>
+                  <p className="font-medium">{latestHttp ? formatUptime(latestHttp.uptime) : '---'}</p>
+                </div>
               </div>
             </div>
           </div>
-
-          <div className={`p-6 rounded-2xl shadow-lg border ${isAlert ? 'bg-red-900/50 border-red-700' : 'bg-white border-slate-200'}`}>
-            <h3 className="text-lg font-medium opacity-80 mb-4">Alocação de Memória RAM</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <h4 className="text-xs uppercase font-bold text-sky-600 mb-2">🌐 Via HTTP API</h4>
-                <p className="text-xl font-bold font-mono">
-                  {latestHttp ? Math.round(latestHttp.memoryUsedMb) : 0} <span className="text-xs opacity-50">MB</span>
-                </p>
-              </div>
-              <div className="border-l pl-4 border-slate-200">
-                <h4 className="text-xs uppercase font-bold text-violet-600 mb-2">📡 Via Agente SNMP</h4>
-                <p className="text-xl font-bold font-mono text-violet-900">
-                  {latestSnmp ? Math.round(latestSnmp.memoryUsedMb) : 0} <span className="text-xs opacity-50">MB</span>
-                </p>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
       </div>
     </div>
   );

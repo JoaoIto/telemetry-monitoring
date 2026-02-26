@@ -54,36 +54,74 @@ export function startAgent(options: AgentOptions = {}) {
 
     const mib = agent.getMib();
 
-    // Background Loop to collect data and update SNMP MIB
+    // ==== UNIFIED METRIC CACHE ====
+    // Calling si.currentLoad() multiple times concurrently breaks its calculation 
+    // because it measures the delta since the *last* call. We must collect once and share.
+    let cachedMetrics = {
+        cpu: 0,
+        memoryUsedMb: 0,
+        memoryTotalMb: 0,
+        rxSec: 0,
+        txSec: 0,
+        diskUsedPercentage: 0,
+        diskTotalGb: 0,
+        os: 'Unknown',
+        uptime: 0,
+        cpuName: 'Unknown',
+        cpuCores: 0,
+        temp: -1
+    };
+
+    // Background Loop to collect data and update both SNMP MIB and HTTP Cache
     setInterval(async () => {
         try {
-            const [cpuLoad, mem, netStats, fsSize, osInfo] = await Promise.all([
-                si.currentLoad(), si.mem(), si.networkStats(), si.fsSize(), si.osInfo()
+            const [cpuLoad, mem, netStats, fsSize, osInfo, cpuInfo, temp] = await Promise.all([
+                si.currentLoad(), si.mem(), si.networkStats(), si.fsSize(), si.osInfo(), si.cpu(), si.cpuTemperature()
             ]);
 
-            const cpuVal = Math.round(cpuLoad.currentLoad);
-            const memUsedMb = Math.round(mem.active / 1024 / 1024);
-            const memTotalMb = Math.round(mem.total / 1024 / 1024);
+            const cpuVal = cpuLoad.currentLoad;
+            const memUsedMb = mem.active / 1024 / 1024;
+            const memTotalMb = mem.total / 1024 / 1024;
 
-            let rx = 0, tx = 0;
+            let rx = 0, tx = 0, rxKb = 0, txKb = 0;
             if (netStats && netStats.length > 0) {
-                const activeNet = netStats.find(n => n.rx_sec > 0 || n.tx_sec > 0) || netStats[0];
-                // Convert to KB/s for SNMP Integer compatibility
-                rx = Math.round(activeNet.rx_sec / 1024);
-                tx = Math.round(activeNet.tx_sec / 1024);
+                const totalRx = netStats.reduce((acc, curr) => acc + (curr.rx_sec || 0), 0);
+                const totalTx = netStats.reduce((acc, curr) => acc + (curr.tx_sec || 0), 0);
+                rx = totalRx / 1024 / 1024; // MB/s for HTTP
+                tx = totalTx / 1024 / 1024;
+                rxKb = Math.round(totalRx / 1024); // KB/s for SNMP Integer
+                txKb = Math.round(totalTx / 1024);
             }
 
-            let diskUsed = 0;
+            let diskPercentage = 0, diskTotalGb = 0;
             if (fsSize && fsSize.length > 0) {
-                diskUsed = Math.round((fsSize[0].used / fsSize[0].size) * 100);
+                diskPercentage = (fsSize[0].used / fsSize[0].size) * 100;
+                diskTotalGb = fsSize[0].size / 1024 / 1024 / 1024;
             }
 
-            mib.setScalarValue("telemetryCpu", cpuVal);
-            mib.setScalarValue("telemetryMemUsed", memUsedMb);
-            mib.setScalarValue("telemetryMemTotal", memTotalMb);
-            mib.setScalarValue("telemetryRx", rx);
-            mib.setScalarValue("telemetryTx", tx);
-            mib.setScalarValue("telemetryDisk", diskUsed);
+            // Update Global Cache for HTTP
+            cachedMetrics = {
+                cpu: cpuVal,
+                memoryUsedMb: memUsedMb,
+                memoryTotalMb: memTotalMb,
+                rxSec: rx,
+                txSec: tx,
+                diskUsedPercentage: diskPercentage,
+                diskTotalGb: diskTotalGb,
+                os: `${osInfo.distro} ${osInfo.release} (${osInfo.platform})`,
+                uptime: si.time().uptime,
+                cpuName: `${cpuInfo.manufacturer} ${cpuInfo.brand}`,
+                cpuCores: cpuInfo.physicalCores,
+                temp: temp.main || -1
+            };
+
+            // Update Local SNMP MIB
+            mib.setScalarValue("telemetryCpu", Math.round(cpuVal));
+            mib.setScalarValue("telemetryMemUsed", Math.round(memUsedMb));
+            mib.setScalarValue("telemetryMemTotal", Math.round(memTotalMb));
+            mib.setScalarValue("telemetryRx", rxKb);
+            mib.setScalarValue("telemetryTx", txKb);
+            mib.setScalarValue("telemetryDisk", Math.round(diskPercentage));
             mib.setScalarValue("telemetryOs", `${osInfo.distro} ${osInfo.release}`);
 
         } catch (e) {
@@ -91,7 +129,7 @@ export function startAgent(options: AgentOptions = {}) {
         }
     }, 2000);
 
-    // Helper to read SNMP data via a Client Session (Simulando o Zabbix)
+    // Helper to read SNMP data via a Client Session (Simulando o Zabbix no Frontend)
     const getSnmpData = (): Promise<any> => {
         return new Promise((resolve, reject) => {
             const session = snmp.createSession("127.0.0.1", "public", { port: snmpPort });
@@ -126,41 +164,12 @@ export function startAgent(options: AgentOptions = {}) {
     const server = http.createServer(async (req, res) => {
         res.setHeader('Access-Control-Allow-Origin', '*');
 
-        // Rota 1: HTTP Polling Direto
+        // Rota 1: HTTP Polling Direto (Consome o Cache)
         if (req.method === 'GET' && req.url === path) {
             try {
-                const [cpuLoad, mem, os, cpuInfo, temp, netStats, fsSize] = await Promise.all([
-                    si.currentLoad(), si.mem(), si.osInfo(), si.cpu(), si.cpuTemperature(),
-                    si.networkStats(), si.fsSize()
-                ]);
-
-                let rxSec = 0, txSec = 0;
-                if (netStats && netStats.length > 0) {
-                    const activeNet = netStats.find(n => n.rx_sec > 0 || n.tx_sec > 0) || netStats[0];
-                    rxSec = activeNet.rx_sec / 1024 / 1024;
-                    txSec = activeNet.tx_sec / 1024 / 1024;
-                }
-
-                let diskUsedRaw = 0, diskTotalRaw = 0;
-                if (fsSize && fsSize.length > 0) {
-                    diskUsedRaw = fsSize[0].used;
-                    diskTotalRaw = fsSize[0].size;
-                }
-
                 const metrics = {
+                    ...cachedMetrics,
                     protocol: 'HTTP Nativo REST',
-                    cpu: cpuLoad.currentLoad,
-                    memoryUsedMb: mem.active / 1024 / 1024,
-                    memoryTotalMb: mem.total / 1024 / 1024,
-                    os: `${os.distro} ${os.release} (${os.platform})`,
-                    uptime: si.time().uptime,
-                    cpuName: `${cpuInfo.manufacturer} ${cpuInfo.brand}`,
-                    cpuCores: cpuInfo.physicalCores,
-                    temp: temp.main || -1,
-                    rxSec: rxSec,
-                    txSec: txSec,
-                    diskUsedPercentage: diskTotalRaw > 0 ? (diskUsedRaw / diskTotalRaw) * 100 : 0,
-                    diskTotalGb: diskTotalRaw / 1024 / 1024 / 1024,
                     timestamp: Date.now()
                 };
 
@@ -171,22 +180,19 @@ export function startAgent(options: AgentOptions = {}) {
                 res.end(JSON.stringify({ error: 'Failed' }));
             }
         }
-        // Rota 2: Simulando Gerente SNMP fazendo Request via UDP
+        // Rota 2: Proxy Gerente SNMP (Lê do Socket UDP real, mas pega extras visuais do Cache)
         else if (req.method === 'GET' && req.url === '/metrics/snmp') {
             try {
                 const snmpValues = await getSnmpData();
 
-                // Mantem os extras via OS pra n quebrar as views, mas os dados REAIS vêm do socket SNMP local
-                const [cpuInfo, fsSize, temp] = await Promise.all([si.cpu(), si.fsSize(), si.cpuTemperature()]);
-
                 const metrics = {
                     ...snmpValues,
                     protocol: 'SNMP Tradicional (UDP 1611)',
-                    uptime: si.time().uptime,
-                    cpuName: `${cpuInfo.manufacturer} ${cpuInfo.brand}`,
-                    cpuCores: cpuInfo.physicalCores,
-                    temp: temp.main || -1,
-                    diskTotalGb: fsSize && fsSize.length > 0 ? fsSize[0].size / 1024 / 1024 / 1024 : 0,
+                    uptime: cachedMetrics.uptime,
+                    cpuName: cachedMetrics.cpuName,
+                    cpuCores: cachedMetrics.cpuCores,
+                    temp: cachedMetrics.temp,
+                    diskTotalGb: cachedMetrics.diskTotalGb,
                     timestamp: Date.now()
                 };
 
