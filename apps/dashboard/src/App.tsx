@@ -26,6 +26,23 @@ interface Point {
   snmp: Metrics | null;
 }
 
+const InfoTooltip = ({ title, text, httpText, snmpText }: { title: string, text: string, httpText?: string, snmpText?: string }) => (
+  <div className="group relative ml-2 inline-flex cursor-help align-middle">
+    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-500 hover:bg-indigo-100 hover:text-indigo-600 transition-colors">?</div>
+    <div className="invisible absolute bottom-full left-1/2 z-50 mb-2 w-80 -translate-x-1/2 rounded-xl border border-slate-700 bg-slate-900 p-4 text-sm text-white opacity-0 shadow-2xl transition-all group-hover:visible group-hover:opacity-100 font-sans pointer-events-none">
+      <h4 className="font-bold text-indigo-300 mb-1">{title}</h4>
+      <p className="opacity-90 leading-relaxed mb-3 text-xs">{text}</p>
+      {(httpText || snmpText) && (
+        <div className="space-y-2 text-xs border-t border-slate-700 pt-3 mt-2">
+          {httpText && <div className="flex gap-2"><span className="text-sky-400 font-bold shrink-0">HTTP:</span><span className="opacity-80">{httpText}</span></div>}
+          {snmpText && <div className="flex gap-2"><span className="text-violet-400 font-bold shrink-0">SNMP:</span><span className="opacity-80">{snmpText}</span></div>}
+        </div>
+      )}
+      <div className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900" />
+    </div>
+  </div>
+);
+
 function App() {
   const [data, setData] = useState<Point[]>([]);
   const [isError, setIsError] = useState(false);
@@ -144,7 +161,15 @@ function App() {
           {/* Coluna Esquerda: Gráfico Duplo (Ocupa 2 colunas) */}
           <div className={`lg:col-span-2 p-6 rounded-2xl shadow-xl transition-colors duration-500 ${isAlert ? 'bg-red-900/50 border border-red-700' : 'bg-white border border-slate-200'}`}>
             <h2 className="text-xl font-semibold mb-6 flex items-center justify-between">
-              <span>Comparativo de Coleta: Carga de CPU</span>
+              <span className="flex items-center">
+                Comparativo de Coleta: Carga de CPU
+                <InfoTooltip
+                  title="Carga Média do Processador"
+                  text="Mede o percentual de tempo que o processador passa executando tarefas em relação ao tempo ocioso nos últimos 2 segundos de coleta."
+                  httpText="Mantém a precisão flutuante matemática via JSON (Ex: 45.3%)."
+                  snmpText="Convertido para Inteiro no servidor e exposto como Int32 na MIB SNMP, ideal para leitura padronizada de modens e roteadores."
+                />
+              </span>
               <div className="flex gap-4">
                 <span className="text-2xl font-black text-sky-600" title="HTTP/REST" >{latestHttp ? Math.round(latestHttp.cpu) : 0}%</span>
                 <span className="text-2xl font-black text-violet-600" title="SNMP/UDP">{latestSnmp ? Math.round(latestSnmp.cpu) : 0}%</span>
@@ -201,7 +226,15 @@ function App() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
           <div className={`p-6 rounded-2xl shadow-lg border ${isAlert ? 'bg-red-900/50 border-red-700' : 'bg-white border-slate-200'}`}>
-            <h3 className="text-lg font-medium opacity-80 mb-4">Tráfego de Rede</h3>
+            <h3 className="text-lg font-medium opacity-80 mb-4 flex items-center">
+              Tráfego de Rede
+              <InfoTooltip
+                title="Soma de Banda Passante I/O"
+                text="Uma totalização viva e contínua do uso de Bytes pelas suas placas de rede de internet, tanto via LAN (Cabo) quanto WLAN (Wi-fi)."
+                httpText="Nós recebemos os montantes em Bytes e renderizamos ativamente a conversão em casas decimais de megabytes por segundo."
+                snmpText="Tivemos que arredondar nativamente em KiloBytes Sec antes de trafegar na Árvore OID (pois os limites estruturais do SNMP Integer quebram fluxos decimais)."
+              />
+            </h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <h4 className="text-xs uppercase font-bold text-sky-600 mb-2">🌐 HTTP</h4>
@@ -217,7 +250,15 @@ function App() {
           </div>
 
           <div className={`p-6 rounded-2xl shadow-lg border ${isAlert ? 'bg-red-900/50 border-red-700' : 'bg-white border-slate-200'}`}>
-            <h3 className="text-lg font-medium opacity-80 mb-4">Alocação de Memória RAM</h3>
+            <h3 className="text-lg font-medium opacity-80 mb-4 flex items-center">
+              Alocação de Memória RAM
+              <InfoTooltip
+                title="Consumo de Memória de Sistema"
+                text="Reflete puramente a memória alocada ativamente por processos do SO, não listando a memória em cache adormecida, o que exibe um uso tangível."
+                httpText="Um payload dinâmico. O HTTP fornece a flexibilidade do client de frontend calcular suas próprias aproximações."
+                snmpText="Forçamos o engessamento na coleta (backend), onde o Agente divide o número para MB inteiro puro e pendura na MIB, economizando processamento front-end dos aparelhos receptores IoT."
+              />
+            </h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <h4 className="text-xs uppercase font-bold text-sky-600 mb-2">🌐 Via HTTP API</h4>
@@ -235,55 +276,71 @@ function App() {
           </div>
 
         </div>
-{/* Coluna Direita: Cards de Status Físico e OS */}
-          <div className="space-y-6">
+        {/* Coluna Direita: Cards de Status Físico e OS */}
+        <div className="space-y-6">
 
-            <div className={`p-6 rounded-2xl shadow-lg border ${isAlert ? 'bg-red-900/30 border-red-800' : 'bg-white border-slate-200'}`}>
-              <h3 className="text-sm font-semibold uppercase tracking-wider opacity-70 mb-4">Disco Local (Comparativo)</h3>
-              <div className="space-y-4">
+          <div className={`p-6 rounded-2xl shadow-lg border ${isAlert ? 'bg-red-900/30 border-red-800' : 'bg-white border-slate-200'}`}>
+            <h3 className="text-sm font-semibold uppercase tracking-wider opacity-70 mb-4 flex items-center">
+              Disco Local (Comparativo)
+              <InfoTooltip
+                title="Uso da Partição de Disco Principal"
+                text="Mede o volume de blocos oculados no HD principal (Drive primário do SO) comparado com o tamanho total e reflete o armazenamento disponível."
+                httpText="A API exporta os dados limpos sem arredondamento. O JSON entrega a relação precisa de Gigabytes."
+                snmpText="Para o payload UDP do SNMP ser mínimo, o Agente tira a média em Porcentagem do Disco, retornando um Inteiro que consome 1 byte."
+              />
+            </h3>
+            <div className="space-y-4">
 
-                {/* HTTP Disk */}
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="font-medium text-xs text-sky-600 font-bold uppercase">🌐 Uso via HTTP</span>
-                    <span className="font-bold text-sm">{latestHttp ? Math.round(latestHttp.diskUsedPercentage) : 0}%</span>
-                  </div>
-                  <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-sky-500 h-1.5 rounded-full" style={{ width: `${latestHttp ? latestHttp.diskUsedPercentage : 0}%` }}></div>
-                  </div>
+              {/* HTTP Disk */}
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="font-medium text-xs text-sky-600 font-bold uppercase">🌐 Uso via HTTP</span>
+                  <span className="font-bold text-sm">{latestHttp ? Math.round(latestHttp.diskUsedPercentage) : 0}%</span>
                 </div>
-
-                {/* SNMP Disk */}
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="font-medium text-xs text-violet-600 font-bold uppercase">📡 Uso via SNMP</span>
-                    <span className="font-bold text-sm">{latestSnmp ? Math.round(latestSnmp.diskUsedPercentage) : 0}%</span>
-                  </div>
-                  <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-violet-500 h-1.5 rounded-full" style={{ width: `${latestSnmp ? latestSnmp.diskUsedPercentage : 0}%` }}></div>
-                  </div>
+                <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-sky-500 h-1.5 rounded-full" style={{ width: `${latestHttp ? latestHttp.diskUsedPercentage : 0}%` }}></div>
                 </div>
-
               </div>
+
+              {/* SNMP Disk */}
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="font-medium text-xs text-violet-600 font-bold uppercase">📡 Uso via SNMP</span>
+                  <span className="font-bold text-sm">{latestSnmp ? Math.round(latestSnmp.diskUsedPercentage) : 0}%</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-violet-500 h-1.5 rounded-full" style={{ width: `${latestSnmp ? latestSnmp.diskUsedPercentage : 0}%` }}></div>
+                </div>
+              </div>
+
             </div>
-            <div className={`p-6 rounded-2xl shadow-lg border ${isAlert ? 'bg-red-900/30 border-red-800' : 'bg-white border-slate-200'}`}>
-              <h3 className="text-sm font-semibold uppercase tracking-wider opacity-70 mb-4">Host OS (Apenas HTTP)</h3>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs opacity-60">Sistema</p>
-                  <p className="font-medium truncate">{latestHttp?.os || '---'}</p>
-                </div>
-                <div>
-                  <p className="text-xs opacity-60">Processador</p>
-                  <p className="font-medium text-sm">{latestHttp?.cpuName || '---'} ({latestHttp?.cpuCores || '-'} Cores)</p>
-                </div>
-                <div>
-                  <p className="text-xs opacity-60">Uptime da Máquina</p>
-                  <p className="font-medium">{latestHttp ? formatUptime(latestHttp.uptime) : '---'}</p>
-                </div>
+          </div>
+          <div className={`p-6 rounded-2xl shadow-lg border ${isAlert ? 'bg-red-900/30 border-red-800' : 'bg-white border-slate-200'}`}>
+            <h3 className="text-sm font-semibold uppercase tracking-wider opacity-70 mb-4 flex items-center">
+              Host OS (Apenas HTTP)
+              <InfoTooltip
+                title="Identidade do Hospedeiro e Uptime"
+                text="A telemetria profunda vai além do uso de hardware, lendo metadados de sistema e chip."
+                httpText="Via TCP/HTTP não há problemas em trafegar Strings pesadas. Lemos toda a Distribuição, arquitetura ARM/x64 e modelo nominativo do Fabricante Inte/AMD na resposta."
+                snmpText="SNMP comumente evita trafegar Strings para ser performático, por isso nós não integramos OIDs para o nome do CPU. Mantivemos apenas a versão do Sistema (OctetString MIB), que é exibida mas não exposta no painel unificado por quebra de design UI."
+              />
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs opacity-60">Sistema</p>
+                <p className="font-medium truncate">{latestHttp?.os || '---'}</p>
+              </div>
+              <div>
+                <p className="text-xs opacity-60">Processador</p>
+                <p className="font-medium text-sm">{latestHttp?.cpuName || '---'} ({latestHttp?.cpuCores || '-'} Cores)</p>
+              </div>
+              <div>
+                <p className="text-xs opacity-60">Uptime da Máquina</p>
+                <p className="font-medium">{latestHttp ? formatUptime(latestHttp.uptime) : '---'}</p>
               </div>
             </div>
           </div>
+        </div>
       </div>
     </div>
   );

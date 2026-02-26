@@ -79,7 +79,37 @@ const metrics = {
 
 ---
 
-## 5. O Monitoramento na Prática (O Dashboard Web)
+## 5. SNMP vs HTTP: Monitoramento Híbrido Simultâneo
+
+Para fins empíricos e acadêmicos, o projeto foi fortificado para **monitorar a máquina simultaneamente usando os dois protocolos**. Isso permite ao engenheiro de redes visualizar o comportamento e disparidade entre eles em tempo real, colhendo o melhor de dois mundos no painel principal:
+
+*   **🌐 HTTP (Transporte TCP):** O agente processa a carga inteira e devolve um JSON mastigado na rota `/metrics`. Pelo TCP ser um protocolo **Orientado a Conexão**, ele garante que cada requisição entre o Dashboard e o Agente seja entregue com integridade, verificando pacotes perdidos. O lado negativo é um maior *Overhead* na rede (cabos) por causa do "3-Way Handshake".
+*   **📡 SNMP (Transporte UDP):** O agente expõe uma árvore crua (*MIB*) via protocolo SNMP raiz na porta 1611. Sendo o transporte **UDP (Não Orientado a Conexão)**, ele apenas "atira" os dados (Fire-and-forget). Sem handshake, o gasto na rede despenca (até 10x menor tamanho de payload), por isso é o **Padrão Ouro e Indústria** em roteadores com processadores minúsculos. O tradeoff é que, em gargalos de rede severos, o dado será perdido sem retransmissão.
+
+No nosso Frontend, o gráfico desenha estas duas linhas temporalmente lidas destas APIs em paralelo, provando de forma cabal a extração simultânea via MIB OID (SNMP) e API REST moderna.
+
+### O Efeito Observador (Observer Effect) e a Coleta em Cache
+Durante o desenvolvimento do monitoramento simultâneo, notamos que o gráfico da CPU disparava diferentes valores loucos para o HTTP (ex: 40%) e para o SNMP (ex: 90%) no mesmo segundo. **Por que isso acontece se os dados vêm da mesma máquina?**
+
+Isso é um clássico *"Efeito do Observador"* em sistemas operacionais. A função que lê a carga da CPU (`si.currentLoad()`) não lê um estado estático; ela calcula **a diferença de carga desde a última vez que foi chamada**. 
+Quando a rota HTTP chamava a função 100ms depois da rotina SNMP chamá-la no background, a API HTTP acabava medindo o estresse da CPU de apenas uma fração de segundo (lixo residual), enquanto o SNMP media outros 1.9 segundos de ociosidade, causando gráficos corrompidos que pareciam Dentes de Serra.
+
+**A Solução Arquitetural:**
+Para consertar a divergência, refatoramos o Agente `@my-infra/agent` para utilizar um **Unified Metric Cache** (Cache Unificado). Agora, a coleta nos sensores do Kernel de Sistema Operacional acontece em uma única e exclusiva _Thread de Background_ (a cada 2 segundos) que salva os dados num Objeto em memória.
+Quando o SNMP-UDP ou o REST-HTTP pedem pelos dados, eles não rodam os sensores novamente, apenas **lêem** passivamente a última "foto tirada" em cache. Isso garante que as duas linhas do gráfico convirjam e andem juntas, pois relatam estatísticas perfeitamente sincrônicas!
+
+### Umas Coisas Que Devem Ser Notadas: Tipagem Dinâmica vs MIB OIDs Estáticas
+Outra dúvida muito pertinente e diferença cabal sobre implementar ambos protocolos reside na flexibilidade dos dados medidos. Notou-se na implementação do *Frontend* diversas vezes que as métricas HTTP vinham com Float (Casas decimais), e os gráficos via SNMP estavam sempre arredondados (Inteiros). 
+
+Isso ocorre pelo contrato rigoroso das engrenagens do **Simple Network Management Protocol**. Um Agente SNMP sério é programado em roteadores IoT com pouca RAM. A Árvore de Dados Gerencial (*Management Information Base - MIB*) obriga o agente a pré-declarar o tipo de dado de cada "Object Identifier" (OID). 
+
+Na nossa Library `/agent`:
+1. **Memória, Rede, RAM e Disk (%)**: O REST API envia esses dados como uma String/JSON imensa com bytes quebrados e exatos, delegando ao Dashboard a conta de dividir por 1024 para renderizar na tela. Quando a mesma medição é chamada pela porta **UDP 1611 SNMP**, nosso agente é obrigado a converter e engessar a medição arredondando para `Integer32`. Assim, nós alocamos literalmente apenas "1 Byte" no cabeçalho UDP, economizando tráfego global da infraestrutura.
+2. **Dados Textuais (SO, Processador Name e Modelos)**: Enviar texto no JSON REST HTTP é comum. No SNMP, trafegar uma corda extensa como _"Intel Gen Intel Core i7-13650HX"_ estoura a banda do protocolo. Por isso, a telemetria HTTP no Dashboard é capaz de mostrar os textos do Hardware; enquanto no protocolo SNMP optamos por não provisionar OIDs para metadados ricos (apenas transportando um `OctetString` simples com a Plataforma OS e cortando o resto).
+
+---
+
+## 6. O Monitoramento na Prática (O Dashboard Web)
 
 O Dashboard `apps/dashboard` (O Monitor) consome e exibe essas métricas ativamente.
 
