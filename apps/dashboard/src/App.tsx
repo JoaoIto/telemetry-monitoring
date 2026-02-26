@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface Metrics {
   cpu: number;
@@ -18,22 +18,43 @@ interface Metrics {
   protocol?: string;
 }
 
+interface Point {
+  timestamp: number;
+  httpCpu: number | null;
+  snmpCpu: number | null;
+  http: Metrics | null;
+  snmp: Metrics | null;
+}
+
 function App() {
-  const [data, setData] = useState<Metrics[]>([]);
+  const [data, setData] = useState<Point[]>([]);
   const [isError, setIsError] = useState(false);
-  const [useSnmp, setUseSnmp] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const endpoint = useSnmp ? '/metrics/snmp' : '/metrics';
-        const response = await fetch(`http://localhost:9090${endpoint}`);
-        if (!response.ok) throw new Error('Network response was not ok');
-        const json = await response.json();
+        const [resHttp, resSnmp] = await Promise.all([
+          fetch('http://localhost:9090/metrics').catch(() => null),
+          fetch('http://localhost:9090/metrics/snmp').catch(() => null)
+        ]);
+
+        const httpJson = resHttp && resHttp.ok ? await resHttp.json() : null;
+        const snmpJson = resSnmp && resSnmp.ok ? await resSnmp.json() : null;
+
+        if (!httpJson && !snmpJson) {
+          throw new Error('Todos os endpoints falharam');
+        }
 
         setData(prevData => {
-          const newData = [...prevData, json];
-          return newData.slice(-30); // Keep last 30 points
+          const newData = [...prevData, {
+            timestamp: Date.now(),
+            httpCpu: httpJson ? httpJson.cpu : null,
+            snmpCpu: snmpJson ? snmpJson.cpu : null,
+            http: httpJson,
+            snmp: snmpJson
+          }];
+          return newData.slice(-30);
         });
         setIsError(false);
       } catch (err) {
@@ -44,10 +65,15 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const latest = data.length > 0 ? data[data.length - 1] : null;
-  const isAlert = latest ? latest.cpu > 80 : false;
+  const latestInfo = data.length > 0 ? data[data.length - 1] : null;
+  const latestHttp = latestInfo?.http;
+  const latestSnmp = latestInfo?.snmp;
+
+  const currentCpu = latestHttp?.cpu || latestSnmp?.cpu || 0;
+  const isAlert = currentCpu > 80;
 
   const formatUptime = (seconds: number) => {
+    if (!seconds) return '---';
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     return `${h}h ${m}m`;
@@ -58,58 +84,67 @@ function App() {
       <div className="max-w-6xl mx-auto space-y-6">
 
         {/* Header e Status */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Observabilidade de Infraestrutura</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Monitoramento Simultâneo Híbrido</h1>
             <p className={`mt-1 text-sm font-medium ${isAlert ? 'text-red-200' : 'text-slate-500'}`}>
-              Monitorando Agente em: <code className="font-mono bg-black/10 px-1 py-0.5 rounded">http://localhost:9090/metrics</code>
+              Agente em: <code className="font-mono bg-black/10 px-1 py-0.5 rounded">http://localhost:9090/</code> | UDP `1611`
             </p>
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Status Indicator */}
+
+            <button
+              onClick={() => setShowInfo(!showInfo)}
+              className="px-4 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-semibold rounded-full shadow-sm border border-indigo-300 transition-colors"
+            >
+              📖 Entender a Diferença
+            </button>
+
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full font-semibold shadow-sm border ${isError
-              ? 'bg-rose-100 text-rose-800 border-rose-300'
-              : isAlert
-                ? 'bg-red-700 text-white border-red-500 animate-pulse'
-                : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                ? 'bg-rose-100 text-rose-800 border-rose-300'
+                : isAlert
+                  ? 'bg-red-700 text-white border-red-500 animate-pulse'
+                  : 'bg-emerald-100 text-emerald-800 border-emerald-300'
               }`}>
               <div className={`w-3 h-3 rounded-full ${isError ? 'bg-rose-500' : isAlert ? 'bg-white' : 'bg-emerald-500'}`} />
-              {isError ? 'Agente Desconectado' : 'Conexão Ativa'}
+              {isError ? 'Agentes Offline' : 'Telemetria Ativa'}
             </div>
 
             {isAlert && !isError && (
               <div className="animate-pulse bg-red-600 px-4 py-2 rounded-full font-bold text-white shadow-lg border border-red-400">
-                ALERTA DE INCIDENTE: Carga de CPU em {Math.round(latest!.cpu)}%
+                ALERTA: CPU {Math.round(currentCpu)}%
               </div>
             )}
 
-            <button
-              onClick={() => { setUseSnmp(!useSnmp); setData([]); }}
-              className={`px-4 py-2 rounded-full font-bold shadow-md transition-colors ${useSnmp
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-slate-200 text-slate-800 hover:bg-slate-300 border border-slate-300'
-                }`}
-            >
-              {useSnmp ? '📡 Via Protocolo SNMP (UDP)' : '🌐 Via API HTTP Direta'}
-            </button>
           </div>
+
+          {/* Balão Explicativo Informativo */}
+          {showInfo && (
+            <div className="absolute top-16 right-0 w-96 z-50 p-6 bg-white rounded-2xl shadow-2xl border border-indigo-100 text-slate-800 text-sm">
+              <h3 className="text-lg font-bold text-indigo-900 mb-2">Protocolos de Telemetria</h3>
+              <p className="mb-2"><strong>🌐 HTTP (TCP):</strong> O agente coleta dados localmente e expõe uma REST API moderna em JSON. Utiliza protocolo TCP conectado que garante que os dados cheguem corretamente, porém possui mais <em>overhead</em> nos cabos de rede pelas negociações TCP.</p>
+              <hr className="my-2 border-slate-100" />
+              <p><strong>📡 SNMP (UDP):</strong> Uma implementação do Protocolo Simples de Gerenciamento de Redes. Ele devolve uma árvore binária MIB rodando numa porta UDP enxuta. Por ser UDP (fire-and-forget), gasta <strong>10x menos recursos de rede</strong> do que o HTTP e é o padrão "ouro" de hardwares de telecomunicação de baixo processamento, mesmo havendo chance de pacotes perdidos caso o tráfego congestionar.</p>
+              <button onClick={() => setShowInfo(false)} className="mt-4 w-full py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">Entendi!</button>
+            </div>
+          )}
+
         </header>
 
         {isError && (
           <div className="bg-yellow-500 text-yellow-950 p-4 rounded-xl shadow-md font-medium border border-yellow-400">
-            ⚠️ O Dashboard não conseguiu alcançar a porta de coleta do agente. O example-server está rodando?
+            ⚠️ O Dashboard não conseguiu se conectar nem na API REST e nem no Proxy SNMP do agente. O example-server está rodando?
           </div>
         )}
 
         {/* Visão Principal Expandida */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
 
-          {/* Coluna Esquerda: Gráfico Principal de CPU (Ocupa 2 colunas) */}
+          {/* Coluna Esquerda: Gráfico Duplo (Ocupa 2 colunas) */}
           <div className={`lg:col-span-2 p-6 rounded-2xl shadow-xl transition-colors duration-500 ${isAlert ? 'bg-red-900/50 border border-red-700' : 'bg-white border border-slate-200'}`}>
             <h2 className="text-xl font-semibold mb-6 flex items-center justify-between">
-              <span>Carga de Processamento (CPU)</span>
-              <span className="text-2xl font-black">{latest ? Math.round(latest.cpu) : 0}%</span>
+              <span>Comparativo de Coleta: Carga de CPU</span>
             </h2>
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -122,7 +157,7 @@ function App() {
                     fontSize={12}
                   />
                   <YAxis domain={[0, 100]} stroke={isAlert ? '#fecaca' : '#64748b'} fontSize={12} />
-                  <Tooltip
+                  <RechartsTooltip
                     labelFormatter={(val) => new Date(val).toLocaleTimeString()}
                     contentStyle={{
                       backgroundColor: isAlert ? '#7f1d1d' : '#ffffff',
@@ -132,12 +167,24 @@ function App() {
                       boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
                     }}
                   />
+                  <Legend verticalAlign="top" height={36} />
                   <Line
+                    name="🌐 HTTP/REST API"
                     type="monotone"
-                    dataKey="cpu"
-                    stroke={isAlert ? '#fef2f2' : '#3b82f6'}
+                    dataKey="httpCpu"
+                    stroke="#0284c7" // light blue
                     strokeWidth={4}
                     dot={false}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    name="📡 SNMP UDP Agent"
+                    type="monotone"
+                    dataKey="snmpCpu"
+                    stroke="#7c3aed" // violet
+                    strokeWidth={4}
+                    dot={false}
+                    strokeDasharray="5 5" // Dashed line to differentiate
                     isAnimationActive={false}
                   />
                 </LineChart>
@@ -148,45 +195,50 @@ function App() {
           {/* Coluna Direita: Cards de Status Físico e OS */}
           <div className="space-y-6">
 
-            {/* Sistema Operacional Card */}
             <div className={`p-6 rounded-2xl shadow-lg border ${isAlert ? 'bg-red-900/30 border-red-800' : 'bg-white border-slate-200'}`}>
-              <h3 className="text-sm font-semibold uppercase tracking-wider opacity-70 mb-4">Informações do Hospedeiro</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider opacity-70 mb-4">Host OS (Apenas HTTP)</h3>
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs opacity-60">Sistema Operacional</p>
-                  <p className="font-medium truncate">{latest?.os || '---'}</p>
+                  <p className="text-xs opacity-60">Sistema</p>
+                  <p className="font-medium truncate">{latestHttp?.os || '---'}</p>
                 </div>
                 <div>
-                  <p className="text-xs opacity-60">Modelo do Processador</p>
-                  <p className="font-medium text-sm">{latest?.cpuName || '---'} ({latest?.cpuCores || '-'} Cores)</p>
+                  <p className="text-xs opacity-60">Processador</p>
+                  <p className="font-medium text-sm">{latestHttp?.cpuName || '---'} ({latestHttp?.cpuCores || '-'} Cores)</p>
                 </div>
-                <div className="flex justify-between">
-                  <div>
-                    <p className="text-xs opacity-60">Uptime da Máquina</p>
-                    <p className="font-medium">{latest ? formatUptime(latest.uptime) : '---'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs opacity-60">Temperatura CPU</p>
-                    <p className={`font-medium ${latest?.temp && latest.temp > 75 ? 'text-orange-500' : ''}`}>
-                      {latest?.temp && latest.temp > 0 ? `${latest.temp}°C` : 'N/A'}
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-xs opacity-60">Uptime da Máquina</p>
+                  <p className="font-medium">{latestHttp ? formatUptime(latestHttp.uptime) : '---'}</p>
                 </div>
               </div>
             </div>
 
-            {/* Armazenamento Card */}
             <div className={`p-6 rounded-2xl shadow-lg border ${isAlert ? 'bg-red-900/30 border-red-800' : 'bg-white border-slate-200'}`}>
-              <h3 className="text-sm font-semibold uppercase tracking-wider opacity-70 mb-4">Unidade de Disco Local</h3>
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span className="font-medium">Ocupado</span>
-                  <span className="font-bold">{latest ? Math.round(latest.diskUsedPercentage) : 0}%</span>
+              <h3 className="text-sm font-semibold uppercase tracking-wider opacity-70 mb-4">Disco Local (Comparativo)</h3>
+              <div className="space-y-4">
+
+                {/* HTTP Disk */}
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <span className="font-medium text-xs text-sky-600 font-bold uppercase">🌐 Uso via HTTP</span>
+                    <span className="font-bold text-sm">{latestHttp ? Math.round(latestHttp.diskUsedPercentage) : 0}%</span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                    <div className="bg-sky-500 h-1.5 rounded-full" style={{ width: `${latestHttp ? latestHttp.diskUsedPercentage : 0}%` }}></div>
+                  </div>
                 </div>
-                <div className="w-full bg-slate-200 rounded-full h-2.5 dark:bg-slate-700 overflow-hidden">
-                  <div className={`h-2.5 rounded-full ${latest && latest.diskUsedPercentage > 90 ? 'bg-rose-500' : 'bg-blue-600'}`} style={{ width: `${latest ? latest.diskUsedPercentage : 0}%` }}></div>
+
+                {/* SNMP Disk */}
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <span className="font-medium text-xs text-violet-600 font-bold uppercase">📡 Uso via SNMP</span>
+                    <span className="font-bold text-sm">{latestSnmp ? Math.round(latestSnmp.diskUsedPercentage) : 0}%</span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                    <div className="bg-violet-500 h-1.5 rounded-full" style={{ width: `${latestSnmp ? latestSnmp.diskUsedPercentage : 0}%` }}></div>
+                  </div>
                 </div>
-                <p className="text-xs opacity-60 mt-2 text-right">De {latest ? Math.round(latest.diskTotalGb) : 0} GB totais</p>
+
               </div>
             </div>
           </div>
@@ -195,35 +247,37 @@ function App() {
         {/* Linha Inferior: Rede e Memória */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-          {/* Rede Card */}
-          <div className={`p-6 rounded-2xl shadow-lg border flex items-center justify-between ${isAlert ? 'bg-red-900/50 border-red-700' : 'bg-white border-slate-200'}`}>
-            <div>
-              <h3 className="text-lg font-medium opacity-80 mb-1">Tráfego de Rede</h3>
-              <p className="text-sm opacity-60">I/O da interface ativa</p>
-            </div>
-            <div className="flex gap-6 text-right">
+          <div className={`p-6 rounded-2xl shadow-lg border ${isAlert ? 'bg-red-900/50 border-red-700' : 'bg-white border-slate-200'}`}>
+            <h3 className="text-lg font-medium opacity-80 mb-4">Tráfego de Rede</h3>
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs uppercase font-bold text-emerald-500">Download (RX)</p>
-                <p className="text-2xl font-mono mt-1">{latest ? latest.rxSec.toFixed(2) : '0.00'} <span className="text-sm opacity-50">MB/s</span></p>
+                <h4 className="text-xs uppercase font-bold text-sky-600 mb-2">🌐 HTTP</h4>
+                <p className="text-sm font-mono text-emerald-600">RX: {latestHttp ? latestHttp.rxSec.toFixed(1) : '0.0'} MB/s</p>
+                <p className="text-sm font-mono text-indigo-600">TX: {latestHttp ? latestHttp.txSec.toFixed(1) : '0.0'} MB/s</p>
               </div>
-              <div>
-                <p className="text-xs uppercase font-bold text-indigo-500">Upload (TX)</p>
-                <p className="text-2xl font-mono mt-1">{latest ? latest.txSec.toFixed(2) : '0.00'} <span className="text-sm opacity-50">MB/s</span></p>
+              <div className="border-l pl-4 border-slate-200">
+                <h4 className="text-xs uppercase font-bold text-violet-600 mb-2">📡 SNMP (UDP)</h4>
+                <p className="text-sm font-mono text-emerald-600">RX: {latestSnmp ? latestSnmp.rxSec.toFixed(1) : '0.0'} MB/s</p>
+                <p className="text-sm font-mono text-indigo-600">TX: {latestSnmp ? latestSnmp.txSec.toFixed(1) : '0.0'} MB/s</p>
               </div>
             </div>
           </div>
 
-          {/* Memória Card */}
-          <div className={`p-6 rounded-2xl shadow-lg border flex items-center justify-between ${isAlert ? 'bg-red-900/50 border-red-700' : 'bg-white border-slate-200'}`}>
-            <div>
-              <h3 className="text-lg font-medium opacity-80 mb-1">Alocação de Memória</h3>
-              <p className="text-sm opacity-60">RAM ativa</p>
-            </div>
-            <div className="text-right">
-              <p className="text-3xl font-bold font-mono">
-                {latest ? Math.round(latest.memoryUsedMb) : 0} <span className="text-lg opacity-50">MB</span>
-              </p>
-              <p className="text-sm opacity-60 font-medium">de {latest ? Math.round(latest.memoryTotalMb) : 0} MB</p>
+          <div className={`p-6 rounded-2xl shadow-lg border ${isAlert ? 'bg-red-900/50 border-red-700' : 'bg-white border-slate-200'}`}>
+            <h3 className="text-lg font-medium opacity-80 mb-4">Alocação de Memória RAM</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h4 className="text-xs uppercase font-bold text-sky-600 mb-2">🌐 Via HTTP API</h4>
+                <p className="text-xl font-bold font-mono">
+                  {latestHttp ? Math.round(latestHttp.memoryUsedMb) : 0} <span className="text-xs opacity-50">MB</span>
+                </p>
+              </div>
+              <div className="border-l pl-4 border-slate-200">
+                <h4 className="text-xs uppercase font-bold text-violet-600 mb-2">📡 Via Agente SNMP</h4>
+                <p className="text-xl font-bold font-mono text-violet-900">
+                  {latestSnmp ? Math.round(latestSnmp.memoryUsedMb) : 0} <span className="text-xs opacity-50">MB</span>
+                </p>
+              </div>
             </div>
           </div>
 
