@@ -4,5 +4,10 @@
   "workspaces": [
     "packages/*",
     "apps/*"
-  ]
+  ],
+  "scripts": {
+    "build:dashboard": "npm run build -w dashboard",
+    "build:agent": "npm run build -w @my-infra/agent",
+    "build:all": "npm run build:dashboard && npm run build:agent"
+  }
 }
