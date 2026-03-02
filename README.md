@@ -8,6 +8,20 @@ O projeto provê uma biblioteca customizada de agenciamento (`@my-infra/agent`),
 ![Dashboard](https://github.com/JoaoIto/telemetry-monitoring/blob/main/docs/imgs/dashboard.png?raw=true)
 ![JSON-Metrics](https://github.com/JoaoIto/telemetry-monitoring/blob/main/docs/imgs/json-metrics.png?raw=true)
 
+## 📦 Instalação e Execução Rápida (NPM Package)
+
+O seu projeto já foi compilado e publicado como um executável universal no NPM.
+
+[![NPM Version](https://img.shields.io/npm/v/my-telemetry.svg)](https://www.npmjs.com/package/my-telemetry)
+
+Para testar o Dashboard completo agora mesmo (sem precisar clonar o repositório), você precisa ter o **Node.js 18+** instalado. No seu terminal, execute apenas:
+
+```bash
+npx my-telemetry
+```
+
+Este comando fará o download instantâneo, ligará os sensores SNMP locais (`1611`) e a API REST (`9090`), além de hospedar o Dashboard React na porta `3000` via Express - abrindo no seu navegador principal automaticamente.
+
 ---
 
 ## 📑 Sumário

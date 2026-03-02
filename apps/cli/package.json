@@ -1,19 +1,21 @@
 {
   "name": "my-telemetry",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Ferramenta CLI para Monitoramento Simultâneo de Hardware via SNMP UDP e REST API",
   "main": "index.js",
   "bin": {
     "my-telemetry": "./bin/cli.js"
   },
   "scripts": {
-    "start": "node ./bin/cli.js"
+    "start": "node ./bin/cli.js",
+    "prepack": "node prepack.js"
   },
   "author": "JoaoIto",
   "license": "ISC",
   "dependencies": {
     "express": "^4.21.2",
     "open": "^10.0.3",
-    "@my-infra/agent": "*"
+    "net-snmp": "^3.26.1",
+    "systeminformation": "^5.25.0"
   }
 }

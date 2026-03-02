@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const express = require('express');
-const { startAgent } = require('@my-infra/agent');
+const { startAgent } = require('../agent/index.js');
 const path = require('path');
 
 // 1. Inicia o Hardware do Agente silenciosamente
@@ -13,10 +13,8 @@ startAgent({ port: 9090 });
 const app = express();
 const PORT = 3000;
 
-// Resolvemos o caminho relativo ao instalar de dentro da node_modules
-// A pasta dist do dashboard precisa ser empacotada junto com o monorepo ou lida globalmente
-// Neste escopo do NPM Workspaces, apontamos para a pasta "apps/dashboard/dist"
-const distPath = path.resolve(__dirname, '../../dashboard/dist');
+// Resolvemos o caminho relativo da pasta empacotada no NPM
+const distPath = path.resolve(__dirname, '../dashboard-dist');
 
 app.use(express.static(distPath));
 
