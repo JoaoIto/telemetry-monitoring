@@ -2,6 +2,13 @@
 
 Uma solução inovadora e completa de observabilidade e monitoramento de hardware em tempo real, rodando de forma híbrida: **SNMP (UDP) + REST API (HTTP)**. Um projeto educacional focado em demonstrar a diferença de overhead e formatação em arquiteturas de redes.
 
+## 🔗 Código Fonte (GitHub Repositório)
+
+Para explorar o código de cada módulo em detalhes, acesse nosso repósitorio oficial aberto no GitHub:
+👉 **[Monitoramento Híbrido Telemetry (GitHub)](https://github.com/JoaoIto/telemetry-monitoring)**
+
+---
+
 ## 🚀 Instalação e Execução Mágica (One-Command)
 
 O pacote provém a interface web (Dashboard Recharts responsivo) interligada ao Agente servidor simultaneamente, sem necessidade de configuração. Na sua máquina local, basta rodar:

@@ -1,10 +1,10 @@
 {
   "name": "my-telemetry",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Ferramenta CLI para Monitoramento Simultâneo de Hardware via SNMP UDP e REST API",
   "main": "index.js",
   "bin": {
-    "my-telemetry": "./bin/cli.js"
+    "my-telemetry": "bin/cli.js"
   },
   "scripts": {
     "start": "node ./bin/cli.js",
